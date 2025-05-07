@@ -3,7 +3,7 @@ name: Deploy YMU_App to Raspberry Pi
 on:
   push:
     branches:
-      - master # Ana branch'inizin adı 'main' ise burayı 'main' olarak değiştirin
+      - master
 
 jobs:
   deploy:
@@ -11,99 +11,99 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: CI: Checkout Code
-      uses: actions/checkout@v4
+      - name: CI - Checkout Code
+        uses: actions/checkout@v4
 
-    - name: CI: .NET Build on Runner
-      run: |
-        dotnet restore YMU_App.csproj
-        dotnet build YMU_App.csproj --configuration Release
+      - name: CI - .NET Build on Runner
+        run: |
+          dotnet restore YMU_App.csproj
+          dotnet build YMU_App.csproj --configuration Release
 
-    - name: CI: Install Tailscale for Runner (Optional)
-      env:
-        TAILSCALE_KEY_IS_SET: ${{ secrets.TAILSCALE_AUTHKEY }}
-      if: env.TAILSCALE_KEY_IS_SET
-      run: |
-        curl -fsSL https://tailscale.com/install.sh | sh
-        sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname github-runner-${{ github.run_id }}
+      - name: CI - Install Tailscale for Runner (Optional)
+        env:
+          TAILSCALE_KEY_IS_SET: ${{ secrets.TAILSCALE_AUTHKEY }}
+        if: env.TAILSCALE_KEY_IS_SET
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname github-runner-${{ github.run_id }}
 
-    - name: CI: Setup SSH Key on Runner
-      run: |
-        echo "Creating .ssh directory on runner"
-        mkdir -p $HOME/.ssh
-        echo "Setting permissions for .ssh on runner"
-        chmod 700 $HOME/.ssh
-        echo "Adding private key to runner"
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > $HOME/.ssh/id_ed25519
-        chmod 600 $HOME/.ssh/id_ed25519
-        echo "Adding Raspberry Pi to known hosts on runner"
-        ssh-keyscan -p ${{ secrets.SSH_PORT || '22' }} ${{ secrets.SSH_HOST }} >> $HOME/.ssh/known_hosts || true
-        echo "Listing .ssh directory on runner"
-        ls -la $HOME/.ssh
+      - name: CI - Setup SSH Key on Runner
+        run: |
+          echo "Creating .ssh directory on runner"
+          mkdir -p $HOME/.ssh
+          echo "Setting permissions for .ssh on runner"
+          chmod 700 $HOME/.ssh
+          echo "Adding private key to runner"
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > $HOME/.ssh/id_ed25519
+          chmod 600 $HOME/.ssh/id_ed25519
+          echo "Adding Raspberry Pi to known hosts on runner"
+          ssh-keyscan -p ${{ secrets.SSH_PORT || '22' }} ${{ secrets.SSH_HOST }} >> $HOME/.ssh/known_hosts || true
+          echo "Listing .ssh directory on runner"
+          ls -la $HOME/.ssh
 
-    - name: CD: Stop and Remove Existing Container on Raspberry Pi
-      run: |
-        echo "Attempting to SSH into ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} to stop container..."
-        ssh -i $HOME/.ssh/id_ed25519 \
-            -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
-            -o StrictHostKeyChecking=no \
-            -p ${{ secrets.SSH_PORT || '22' }} \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-          echo "Connected to server for stopping container."
-          docker stop ymuapp || true
-          docker rm ymuapp || true
-          echo "Container stop/remove commands executed."
-        EOF
+      - name: CD - Stop and Remove Existing Container on Raspberry Pi
+        run: |
+          echo "Attempting to SSH into ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} to stop container..."
+          ssh -i $HOME/.ssh/id_ed25519 \
+              -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
+              -o StrictHostKeyChecking=no \
+              -p ${{ secrets.SSH_PORT || '22' }} \
+              ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            echo "Connected to server for stopping container."
+            docker stop ymuapp || true
+            docker rm ymuapp || true
+            echo "Container stop/remove commands executed."
+          EOF
 
-    - name: CD: Update Code on Raspberry Pi via Git Pull
-      env:
-        GIT_REPO_URL: "https://github.com/${{ github.repository }}.git"
-        PROJECT_DIR: "/home/${{ secrets.SSH_USER }}/ymuapp"
-        BRANCH_NAME: "master" # Ana branch'inizin adı 'main' ise burayı 'main' olarak değiştirin
-      run: |
-        echo "Attempting to SSH into ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} to update code..."
-        ssh -i $HOME/.ssh/id_ed25519 \
-            -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
-            -o StrictHostKeyChecking=no \
-            -p ${{ secrets.SSH_PORT || '22' }} \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-          echo "Connected to server for git pull."
-          if [ -d "${PROJECT_DIR}/.git" ]; then
-            echo "Repository exists at ${PROJECT_DIR}, pulling latest changes..."
-            cd "${PROJECT_DIR}"
-            git checkout "${BRANCH_NAME}"
-            git fetch origin
-            git reset --hard "origin/${BRANCH_NAME}"
-            echo "Git pull completed."
-          else
-            echo "Repository does not exist at ${PROJECT_DIR}, cloning..."
-            rm -rf "${PROJECT_DIR}"
-            git clone --branch "${BRANCH_NAME}" "${GIT_REPO_URL}" "${PROJECT_DIR}"
-            echo "Git clone completed."
-          fi
-        EOF
+      - name: CD - Update Code on Raspberry Pi via Git Pull
+        env:
+          GIT_REPO_URL: "https://github.com/${{ github.repository }}.git"
+          PROJECT_DIR: "/home/${{ secrets.SSH_USER }}/ymuapp"
+          BRANCH_NAME: "master"
+        run: |
+          echo "Attempting to SSH into ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} to update code..."
+          ssh -i $HOME/.ssh/id_ed25519 \
+              -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
+              -o StrictHostKeyChecking=no \
+              -p ${{ secrets.SSH_PORT || '22' }} \
+              ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            echo "Connected to server for git pull."
+            if [ -d "${PROJECT_DIR}/.git" ]; then
+              echo "Repository exists at ${PROJECT_DIR}, pulling latest changes..."
+              cd "${PROJECT_DIR}"
+              git checkout "${BRANCH_NAME}"
+              git fetch origin
+              git reset --hard "origin/${BRANCH_NAME}"
+              echo "Git pull completed."
+            else
+              echo "Repository does not exist at ${PROJECT_DIR}, cloning..."
+              rm -rf "${PROJECT_DIR}"
+              git clone --branch "${BRANCH_NAME}" "${GIT_REPO_URL}" "${PROJECT_DIR}"
+              echo "Git clone completed."
+            fi
+          EOF
 
-    - name: CD: Build Docker Image on Raspberry Pi
-      run: |
-        ssh -i $HOME/.ssh/id_ed25519 \
-            -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
-            -o StrictHostKeyChecking=no \
-            -p ${{ secrets.SSH_PORT || '22' }} \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-          echo "Building Docker image on Raspberry Pi..."
-          cd /home/${{ secrets.SSH_USER }}/ymuapp
-          docker build -t ymuapp:latest .
-          echo "Docker image built."
-        EOF
+      - name: CD - Build Docker Image on Raspberry Pi
+        run: |
+          ssh -i $HOME/.ssh/id_ed25519 \
+              -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
+              -o StrictHostKeyChecking=no \
+              -p ${{ secrets.SSH_PORT || '22' }} \
+              ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            echo "Building Docker image on Raspberry Pi..."
+            cd /home/${{ secrets.SSH_USER }}/ymuapp
+            docker build -t ymuapp:latest .
+            echo "Docker image built."
+          EOF
 
-    - name: CD: Run Docker Container on Raspberry Pi
-      run: |
-        ssh -i $HOME/.ssh/id_ed25519 \
-            -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
-            -o StrictHostKeyChecking=no \
-            -p ${{ secrets.SSH_PORT || '22' }} \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-          echo "Running new Docker container on Raspberry Pi..."
-          docker run -d -p 1001:8080 --restart always --name ymuapp ymuapp:latest
-          echo "New Docker container is running."
-        EOF
+      - name: CD - Run Docker Container on Raspberry Pi
+        run: |
+          ssh -i $HOME/.ssh/id_ed25519 \
+              -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
+              -o StrictHostKeyChecking=no \
+              -p ${{ secrets.SSH_PORT || '22' }} \
+              ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            echo "Running new Docker container on Raspberry Pi..."
+            docker run -d -p 1001:8080 --restart always --name ymuapp ymuapp:latest
+            echo "New Docker container is running."
+          EOF
