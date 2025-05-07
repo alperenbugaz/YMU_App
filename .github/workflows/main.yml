@@ -19,7 +19,7 @@ jobs:
         dotnet build YMU_App.csproj --configuration Release # .csproj dosyanızın adını kontrol edin
 
     - name: Install Tailscale (Opsiyonel)
-      if: ${{ secrets.TAILSCALE_AUTHKEY != '' }}
+      if: ${{ secrets.TAILSCALE_AUTHKEY }}
       run: |
         curl -fsSL https://tailscale.com/install.sh | sh
         sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname github-runner-${{ github.run_id }}
@@ -65,8 +65,8 @@ jobs:
             -o StrictHostKeyChecking=no \
             -p ${{ secrets.SSH_PORT || '22' }} \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-          cd /home/${{ secrets.SSH_USER }}/ymuapp
-          docker build -t ymuapp:latest .
+          cd /home/${{ secrets.SSH_USER }}/ymuapp  # Proje dosyalarını kopyaladığınız klasör
+          docker build -t ymuapp:latest .         # Docker imaj adınızı buraya yazın
         EOF
 
     - name: 🚀 Sunucuda Docker Konteynerini Çalıştır
@@ -78,5 +78,5 @@ jobs:
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
           # Raspberry Pi'nin 1001 portunu konteynerin 8080 portuna yönlendiriyoruz.
           # Dockerfile'ınızdaki uygulamanız konteyner içinde 8080 portunu dinliyor olmalı.
-          docker run -d -p 1001:8080 --restart always --name ymuapp ymuapp:latest
+          docker run -d -p 1001:8080 --restart always --name ymuapp ymuapp:latest # Konteyner ve imaj adını buraya yazın
         EOF
