@@ -55,9 +55,10 @@ jobs:
             echo "Container stop/remove commands executed."
           EOF
 
-      - name: CD - Update Code on Raspberry Pi via Git Pull
+      - name: CD - Update Code on Raspberry Pi via Git (SSH URL)
         env:
-          GIT_REPO_URL: "https://github.com/${{ github.repository }}.git"
+          # SSH URL formatını kullanıyoruz. Deploy Key ayarlanmış olmalı.
+          GIT_REPO_URL: "git@github.com:${{ github.repository }}.git"
           PROJECT_DIR: "/home/${{ secrets.SSH_USER }}/ymuapp"
           BRANCH_NAME: "master"
         run: |
@@ -67,21 +68,22 @@ jobs:
               -o StrictHostKeyChecking=no \
               -p ${{ secrets.SSH_PORT || '22' }} \
               ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOF
-            echo "Connected to server for git pull."
-            export GIT_TERMINAL_PROMPT=0 # Git'in interaktif olmasını engelle
+            echo "Connected to server for git operations."
             
             if [ -d "${PROJECT_DIR}/.git" ]; then
               echo "Repository exists at '${PROJECT_DIR}', pulling latest changes..."
               cd "${PROJECT_DIR}"
               echo "Checking out branch '${BRANCH_NAME}'..."
               git checkout "${BRANCH_NAME}"
-              echo "Fetching from origin..."
+              echo "Fetching from origin (SSH)..."
+              # Uzak bağlantının URL'sini kontrol et (opsiyonel ama faydalı)
+              git remote set-url origin "${GIT_REPO_URL}" || echo "Failed to set remote URL, continuing..."
               git fetch origin
               echo "Resetting to origin/${BRANCH_NAME}..."
               git reset --hard "origin/${BRANCH_NAME}"
-              echo "Git pull completed."
+              echo "Git update completed."
             else
-              echo "Repository does not exist at '${PROJECT_DIR}', cloning '${GIT_REPO_URL}'..."
+              echo "Repository does not exist at '${PROJECT_DIR}', cloning '${GIT_REPO_URL}' (SSH)..."
               rm -rf "${PROJECT_DIR}" # Önceki (belki bozuk) klasörü sil
               git clone --branch "${BRANCH_NAME}" "${GIT_REPO_URL}" "${PROJECT_DIR}"
               echo "Git clone completed."
