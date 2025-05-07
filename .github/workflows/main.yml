@@ -10,73 +10,73 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 🚀 Kodu Checkout Et
+    - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: 🛠 .NET Build (Runner üzerinde ön derleme)
+    - name: .NET Build
       run: |
-        dotnet restore YMU_App.csproj # .csproj dosyanızın adını kontrol edin
-        dotnet build YMU_App.csproj --configuration Release # .csproj dosyanızın adını kontrol edin
+        dotnet restore YMU_App.csproj
+        dotnet build YMU_App.csproj --configuration Release
 
-    - name: Install Tailscale (Opsiyonel)
-      if: ${{ secrets.TAILSCALE_AUTHKEY }}
+    - name: Install Tailscale (Optional)
+      env:
+        TAILSCALE_KEY_IS_SET: ${{ secrets.TAILSCALE_AUTHKEY }}
+      if: env.TAILSCALE_KEY_IS_SET
       run: |
         curl -fsSL https://tailscale.com/install.sh | sh
         sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname github-runner-${{ github.run_id }}
 
-    - name: 🔑 SSH Key Kurulumu ve Sunucuya Bağlantı Hazırlığı
+    - name: Setup SSH Key and Prepare Server Connection
       run: |
         echo "Creating .ssh directory"
         mkdir -p $HOME/.ssh
         echo "Setting permissions for .ssh"
         chmod 700 $HOME/.ssh
         echo "Adding private key"
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > $HOME/.ssh/id_ed25519 # Kullandığınız anahtar tipine göre (örn: id_rsa) değiştirebilirsiniz
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > $HOME/.ssh/id_ed25519
         chmod 600 $HOME/.ssh/id_ed25519
         echo "Running ssh-keyscan"
         ssh-keyscan -p ${{ secrets.SSH_PORT || '22' }} ${{ secrets.SSH_HOST }} >> $HOME/.ssh/known_hosts || true
         echo "Listing .ssh directory"
         ls -la $HOME/.ssh
 
-    - name: 💂🏻 Mevcut Konteyneri Durdur ve Sil
+    - name: Stop and Remove Existing Container
       run: |
         ssh -i $HOME/.ssh/id_ed25519 \
             -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
             -o StrictHostKeyChecking=no \
             -p ${{ secrets.SSH_PORT || '22' }} \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-          docker stop ymuapp || true   # Konteyner adınızı buraya yazın
-          docker rm ymuapp || true     # Konteyner adınızı buraya yazın
+          docker stop ymuapp || true
+          docker rm ymuapp || true
         EOF
 
-    - name: 📂 Sunucuya Proje Dosyalarını Kopyala
+    - name: Copy Project Files to Server
       run: |
         scp -i $HOME/.ssh/id_ed25519 \
             -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
             -o StrictHostKeyChecking=no \
             -P ${{ secrets.SSH_PORT || '22' }} \
             -r ./ \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/ymuapp # Hedef klasör adını buraya yazın
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/ymuapp
 
-    - name: 🔄 Sunucuda Docker Image Oluştur
+    - name: Build Docker Image on Server
       run: |
         ssh -i $HOME/.ssh/id_ed25519 \
             -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
             -o StrictHostKeyChecking=no \
             -p ${{ secrets.SSH_PORT || '22' }} \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-          cd /home/${{ secrets.SSH_USER }}/ymuapp  # Proje dosyalarını kopyaladığınız klasör
-          docker build -t ymuapp:latest .         # Docker imaj adınızı buraya yazın
+          cd /home/${{ secrets.SSH_USER }}/ymuapp
+          docker build -t ymuapp:latest .
         EOF
 
-    - name: 🚀 Sunucuda Docker Konteynerini Çalıştır
+    - name: Run Docker Container on Server
       run: |
         ssh -i $HOME/.ssh/id_ed25519 \
             -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
             -o StrictHostKeyChecking=no \
             -p ${{ secrets.SSH_PORT || '22' }} \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-          # Raspberry Pi'nin 1001 portunu konteynerin 8080 portuna yönlendiriyoruz.
-          # Dockerfile'ınızdaki uygulamanız konteyner içinde 8080 portunu dinliyor olmalı.
-          docker run -d -p 1001:8080 --restart always --name ymuapp ymuapp:latest # Konteyner ve imaj adını buraya yazın
+          docker run -d -p 1001:8080 --restart always --name ymuapp ymuapp:latest
         EOF
