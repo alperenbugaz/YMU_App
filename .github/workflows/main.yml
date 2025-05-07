@@ -57,7 +57,6 @@ jobs:
 
       - name: CD - Update Code on Raspberry Pi via Git (SSH URL)
         env:
-          # SSH URL formatını kullanıyoruz. Deploy Key ayarlanmış olmalı.
           GIT_REPO_URL: "git@github.com:${{ github.repository }}.git"
           PROJECT_DIR: "/home/${{ secrets.SSH_USER }}/ymuapp"
           BRANCH_NAME: "master"
@@ -70,13 +69,17 @@ jobs:
               ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOF
             echo "Connected to server for git operations."
             
+            # Ensure .ssh directory exists and add github.com to known_hosts on Raspberry Pi
+            mkdir -p ~/.ssh
+            ssh-keyscan github.com >> ~/.ssh/known_hosts
+            chmod 644 ~/.ssh/known_hosts # Ensure correct permissions for known_hosts
+            
             if [ -d "${PROJECT_DIR}/.git" ]; then
               echo "Repository exists at '${PROJECT_DIR}', pulling latest changes..."
               cd "${PROJECT_DIR}"
               echo "Checking out branch '${BRANCH_NAME}'..."
               git checkout "${BRANCH_NAME}"
               echo "Fetching from origin (SSH)..."
-              # Uzak bağlantının URL'sini kontrol et (opsiyonel ama faydalı)
               git remote set-url origin "${GIT_REPO_URL}" || echo "Failed to set remote URL, continuing..."
               git fetch origin
               echo "Resetting to origin/${BRANCH_NAME}..."
