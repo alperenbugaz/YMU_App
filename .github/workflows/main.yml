@@ -66,17 +66,22 @@ jobs:
               -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
               -o StrictHostKeyChecking=no \
               -p ${{ secrets.SSH_PORT || '22' }} \
-              ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+              ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOF
             echo "Connected to server for git pull."
+
+            
             if [ -d "${PROJECT_DIR}/.git" ]; then
-              echo "Repository exists at ${PROJECT_DIR}, pulling latest changes..."
+              echo "Repository exists at '${PROJECT_DIR}', pulling latest changes..."
               cd "${PROJECT_DIR}"
+              echo "Checking out branch '${BRANCH_NAME}'..."
               git checkout "${BRANCH_NAME}"
+              echo "Fetching from origin..."
               git fetch origin
+              echo "Resetting to origin/${BRANCH_NAME}..."
               git reset --hard "origin/${BRANCH_NAME}"
               echo "Git pull completed."
             else
-              echo "Repository does not exist at ${PROJECT_DIR}, cloning..."
+              echo "Repository does not exist at '${PROJECT_DIR}', cloning '${GIT_REPO_URL}'..."
               rm -rf "${PROJECT_DIR}"
               git clone --branch "${BRANCH_NAME}" "${GIT_REPO_URL}" "${PROJECT_DIR}"
               echo "Git clone completed."
