@@ -32,23 +32,28 @@ jobs:
         mkdir -p $HOME/.ssh
         echo "Setting permissions for .ssh"
         chmod 700 $HOME/.ssh
-        echo "Adding private key"
+        echo "Adding private key to runner"
         echo "${{ secrets.SSH_PRIVATE_KEY }}" > $HOME/.ssh/id_ed25519
         chmod 600 $HOME/.ssh/id_ed25519
+        echo "Fingerprint of the private key on runner:"
+        ssh-keygen -lf $HOME/.ssh/id_ed25519 # Bu satır anahtarın parmak izini yazdırır
         echo "Running ssh-keyscan"
         ssh-keyscan -p ${{ secrets.SSH_PORT || '22' }} ${{ secrets.SSH_HOST }} >> $HOME/.ssh/known_hosts || true
-        echo "Listing .ssh directory"
+        echo "Listing .ssh directory on runner"
         ls -la $HOME/.ssh
 
     - name: Stop and Remove Existing Container
       run: |
-        ssh -i $HOME/.ssh/id_ed25519 \
+        echo "Attempting to SSH into ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} to stop container..."
+        ssh -vvv -i $HOME/.ssh/id_ed25519 \
             -oKexAlgorithms=+diffie-hellman-group14-sha1 -oCiphers=aes128-ctr \
             -o StrictHostKeyChecking=no \
             -p ${{ secrets.SSH_PORT || '22' }} \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          echo "Connected to server for stopping container."
           docker stop ymuapp || true
           docker rm ymuapp || true
+          echo "Container stop/remove commands executed."
         EOF
 
     - name: Copy Project Files to Server
